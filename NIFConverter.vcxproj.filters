@@ -15,7 +15,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="KFConverter.cpp">
+    <ClCompile Include="NIFConverter.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
