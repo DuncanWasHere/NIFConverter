@@ -104,7 +104,7 @@ void processJsonFile(const fs::path& inputDir) {
 	std::ifstream inputJson(inputDir);
 
 	if (!inputJson.is_open()) {
-		outputToConsoleAndFile("Error: Unable to open input file: " + relativeDir.u8string() + "\n", LOG_FILE);
+		outputToConsoleAndFile("ERROR: Unable to open input file: " + relativeDir.u8string() + "\n", LOG_FILE);
 		return;
 	}
 	else
@@ -131,7 +131,7 @@ void processJsonFile(const fs::path& inputDir) {
 			niHeader["Endian Type"] = "ENDIAN_LITTLE";
 	}
 	else
-		outputToConsoleAndFile("Error: NiHeader not found in: " + relativeDir.u8string() + " File is likely the wrong format or corrupted!\n", LOG_FILE);
+		outputToConsoleAndFile("ERROR: NiHeader not found in: " + relativeDir.u8string() + " File is likely the wrong format or corrupted!\n", LOG_FILE);
 
 
 	// Add BSShaderPPLightingProperty, BSShaderTextureSet, and update NiGeomMorpherController and Vertex properties
@@ -222,6 +222,49 @@ void processJsonFile(const fs::path& inputDir) {
 			replaceJsonSubstring(geomDataBlock, "UV_4", "Has_UV");
 		}
 
+		else if (str == "NiControllerSequence") {
+			size_t numControlledBlocks = 0;
+			nlohmann::ordered_json& controllerSequence = jsonData[i.key() + " " + str];
+			if (controllerSequence.contains("Controlled Blocks")) {
+				nlohmann::ordered_json& stringPaletteBlock = jsonData[controllerSequence["String Palette"]];
+				std::string stringPalette = stringPaletteBlock["Palette"];
+				nlohmann::ordered_json& controlledBlocks = controllerSequence["Controlled Blocks"];
+				numControlledBlocks = controlledBlocks.size();
+
+				// Extract substrings based on offsets
+				std::vector<std::string> nodeNames(numControlledBlocks);
+				size_t nodeNameOffset;
+				std::vector<std::string> controllerTypes(numControlledBlocks);
+				size_t controllerTypeOffset;
+				std::vector<std::string> interpolatorIDs(numControlledBlocks);
+				size_t interpolatorIDOffset;
+				size_t nextNullTerminatorPos;
+
+				for (auto& j : controlledBlocks.items()) {
+					nlohmann::ordered_json& controlledBlock = j.value();
+
+					// Node Name
+					nodeNameOffset = std::stoul(controlledBlock["Node Name Offset"].get<std::string>());
+					nextNullTerminatorPos = stringPalette.find('\u0000', nodeNameOffset);
+					controlledBlock["Node Name"] = stringPalette.substr(nodeNameOffset, nextNullTerminatorPos - nodeNameOffset);
+
+					// Controller Type
+					controllerTypeOffset = std::stoul(controlledBlock["Controller Type Offset"].get<std::string>());
+					nextNullTerminatorPos = stringPalette.find('\u0000', controllerTypeOffset);
+					controlledBlock["Controller Type"] = stringPalette.substr(controllerTypeOffset, nextNullTerminatorPos - controllerTypeOffset);
+
+					// Interpolator ID
+					if (controlledBlock["Controller Type"] == "NiGeomMorpherController") {
+						interpolatorIDOffset = std::stoul(controlledBlock["Interpolator ID Offset"].get<std::string>());
+						nextNullTerminatorPos = stringPalette.find('\u0000', interpolatorIDOffset);
+						controlledBlock["Interpolator ID"] = stringPalette.substr(interpolatorIDOffset, nextNullTerminatorPos - interpolatorIDOffset);
+					}
+				}
+			}
+			else
+				outputToConsoleAndFile("ERROR: NiControllerSequence found but no Controlled Blocks!\n", LOG_FILE);
+		}
+
 	}
 
 
@@ -287,7 +330,7 @@ void runSniffCommand(const std::string& operation, const fs::path& inputDir, con
 		+ " -subdir:yes -skip:yes -log:\"Sniff.log\"";
 	int result = system(command.c_str());
 	if (result != 0) {
-		outputToConsoleAndFile("Error: SNIFF command failed with code " + std::to_string(result) + "\n", LOG_FILE);
+		outputToConsoleAndFile("ERROR: SNIFF command failed with code " + std::to_string(result) + "\n", LOG_FILE);
 	}
 }
 
