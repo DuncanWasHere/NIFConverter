@@ -142,6 +142,8 @@ void processJsonFile(const std::string& inputFileName) {
                 nlohmann::json niFooter = it.value();
                 jsonData.erase(it);
                 jsonData["NiFooter"] = niFooter;
+
+                blockTypeIndexRange++;
             }
         }
 
