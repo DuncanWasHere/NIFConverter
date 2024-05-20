@@ -23,5 +23,8 @@
     <ClInclude Include="nlohmann\json.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="NIFConverter.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

@@ -132,6 +132,7 @@
     <ClCompile Include="NIFConverter.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="NIFConverter.hpp" />
     <ClInclude Include="nlohmann\json.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
