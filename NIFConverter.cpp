@@ -229,6 +229,8 @@ void processJsonFile(const fs::path& inputDir) {
 		else if (str == "NiControllerSequence") {
 			size_t numControlledBlocks = 0;
 			nlohmann::ordered_json& controllerSequence = jsonData[i.key() + " " + str];
+			if (!controllerSequence.contains("String Palette"))
+				continue;
 			if (controllerSequence.contains("Controlled Blocks")) {
 				nlohmann::ordered_json& stringPaletteBlock = jsonData[controllerSequence["String Palette"]];
 				std::string stringPalette = stringPaletteBlock["Palette"];
