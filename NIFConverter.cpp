@@ -98,6 +98,8 @@ int main() {
 
 void processJsonFile(const fs::path& inputDir) {
 
+	bool hasParticles = 0;
+
 	// Open input JSON
 	fs::path relativeDir = fs::relative(inputDir, TEMP_JSON_FOLDER_PATH);
 	fs::path outputDir = TEMP_JSON_FOLDER_PATH / relativeDir;
@@ -142,11 +144,27 @@ void processJsonFile(const fs::path& inputDir) {
 
 		std::string str = i.value();
 
+		// NiGeometry
 		if (str == "NiTriStrips" || str == "NiTriShape") {
+			outputToConsoleAndFile("Updating NiGeometry:" + i.key() + " " + str + "\n", LOG_FILE);
 			nlohmann::ordered_json& geomBlock = jsonData[i.key() + " " + str];
+
+			// Get NiSourceTexture from NiTexturingProperty
 			nlohmann::ordered_json texturingProperty = GetNIFBlockFromArray(jsonData, geomBlock["Properties"], "NiTexturingProperty");
+
 			if (!texturingProperty.is_null()) {
-				nlohmann::ordered_json sourceTexture = jsonData[texturingProperty["Base Texture"]["Source"]];
+				nlohmann::ordered_json sourceTexture;
+
+				// Get texture file path from NiSourceTexture
+				if (texturingProperty.contains("Base Texture"))
+					sourceTexture = jsonData[texturingProperty["Base Texture"]["Source"]];
+				else if (texturingProperty.contains("Dark Texture"))
+					sourceTexture = jsonData[texturingProperty["Dark Texture"]["Source"]];
+				else {
+					outputToConsoleAndFile("ERROR: No source texture found!\n", LOG_FILE);
+					continue;
+				}
+
 				std::string texturePath = sourceTexture["File Name"];
 				std::transform(texturePath.begin(), texturePath.end(), texturePath.begin(), ::tolower);
 				size_t pos = texturePath.rfind(".dds");
@@ -154,11 +172,11 @@ void processJsonFile(const fs::path& inputDir) {
 					texturePath.erase(pos);
 				else
 					outputToConsoleAndFile("ERROR: Texture path invalid for " + std::to_string(blockTypeIndexRange + 1) + " BSShaderTextureSet. Manual correction will be required!\n", LOG_FILE);
-				size_t geomBlockNumProperties = geomBlock["Properties"].size();
 
+				// Add BSShaderPPLightingProperty
+				size_t geomBlockNumProperties = geomBlock["Properties"].size();
 				auto& properties = geomBlock["Properties"];
 				properties.push_back(std::to_string(blockTypeIndexRange) + " BSShaderPPLightingProperty");
-
 				nlohmann::ordered_json shaderPPLightingProperty;
 				jsonData[std::to_string(blockTypeIndexRange) + " BSShaderPPLightingProperty"] = {
 					{"Name", ""},
@@ -182,6 +200,7 @@ void processJsonFile(const fs::path& inputDir) {
 					jsonData["NiHeader"]["Block Types"].push_back("BSShaderPPLightingProperty");
 				blockTypeIndexRange++;
 
+				// Add BSShaderTextureSet
 				jsonData[std::to_string(blockTypeIndexRange) + " BSShaderTextureSet"] = {
 					{"Textures", nlohmann::json::array({texturePath + ".dds", texturePath + "_n.dds", texturePath + "_g.dds", "", "", ""})},
 				};
@@ -189,6 +208,7 @@ void processJsonFile(const fs::path& inputDir) {
 				if (!jsonData["NiHeader"]["Block Types"].contains("BSShaderTextureSet"))
 					jsonData["NiHeader"]["Block Types"].push_back("BSShaderTextureSet");
 
+				// Update NiHeader and move NiFooter to bottom of file
 				std::string numBlocks = jsonData["NiHeader"]["Num Blocks"];
 				numBlocks = std::to_string(std::stoi(numBlocks) + 2);
 				jsonData["NiHeader"]["Num Blocks"] = numBlocks;
@@ -205,7 +225,9 @@ void processJsonFile(const fs::path& inputDir) {
 
 		}
 
+		// NiGeomMorpherController
 		else if (str == "NiGeomMorpherController") {
+			outputToConsoleAndFile("Updating NiGeomMorpherController:" + i.key() + " " + str + "\n", LOG_FILE);
 			nlohmann::ordered_json& geomMorpherController = jsonData[i.key() + " " + str];
 			std::vector<std::string> interpolators;
 			interpolators = geomMorpherController["Interpolators"];
@@ -218,7 +240,9 @@ void processJsonFile(const fs::path& inputDir) {
 			}
 		}
 
+		// NiGeometryData
 		else if (str == "NiTriStripsData" || str == "NiTriShapeData") {
+			outputToConsoleAndFile("Updating NiGeometryData:" + i.key() + " " + str + "\n", LOG_FILE);
 			nlohmann::ordered_json& geomDataBlock = jsonData[i.key() + " " + str];
 			replaceJsonSubstring(geomDataBlock, "UV_1", "Has_UV");
 			replaceJsonSubstring(geomDataBlock, "UV_2", "Has_UV");
@@ -226,12 +250,15 @@ void processJsonFile(const fs::path& inputDir) {
 			replaceJsonSubstring(geomDataBlock, "UV_4", "Has_UV");
 		}
 
+		// NiControllerSequence
 		else if (str == "NiControllerSequence") {
+			outputToConsoleAndFile("Updating NiControllerSequence:" + i.key() + " " + str + "\n", LOG_FILE);
 			size_t numControlledBlocks = 0;
 			nlohmann::ordered_json& controllerSequence = jsonData[i.key() + " " + str];
 			if (!controllerSequence.contains("String Palette"))
 				continue;
 			if (controllerSequence.contains("Controlled Blocks")) {
+				// Get NiStringPalette from NiControllerSequence
 				nlohmann::ordered_json& stringPaletteBlock = jsonData[controllerSequence["String Palette"]];
 				std::string stringPalette = stringPaletteBlock["Palette"];
 				nlohmann::ordered_json& controlledBlocks = controllerSequence["Controlled Blocks"];
@@ -245,7 +272,7 @@ void processJsonFile(const fs::path& inputDir) {
 				std::vector<std::string> interpolatorIDs(numControlledBlocks);
 				size_t interpolatorIDOffset;
 				size_t nextNullTerminatorPos;
-	
+
 				for (auto& j : controlledBlocks.items()) {
 					nlohmann::ordered_json& controlledBlock = j.value();
 
@@ -260,7 +287,7 @@ void processJsonFile(const fs::path& inputDir) {
 					controlledBlock["Controller Type"] = stringPalette.substr(controllerTypeOffset, nextNullTerminatorPos - controllerTypeOffset);
 
 					// Interpolator ID
-					if (controlledBlock["Controller Type"] == "NiGeomMorpherController") {
+					if (controlledBlock["Controller Type"] == "NiGeomMorpherController" || controlledBlock["Controller Type"] == "NiPSysEmitterCtlr") {
 						interpolatorIDOffset = std::stoul(controlledBlock["Interpolator ID Offset"].get<std::string>());
 						nextNullTerminatorPos = stringPalette.find('\u0000', interpolatorIDOffset);
 						controlledBlock["Interpolator ID"] = stringPalette.substr(interpolatorIDOffset, nextNullTerminatorPos - interpolatorIDOffset);
@@ -270,6 +297,10 @@ void processJsonFile(const fs::path& inputDir) {
 			else
 				outputToConsoleAndFile("ERROR: NiControllerSequence found but no Controlled Blocks!\n", LOG_FILE);
 		}
+
+		// NiParticleSystem
+		else if (str == "NiParticleSystem")
+			hasParticles = 1;
 
 	}
 
