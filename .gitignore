@@ -361,3 +361,18 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Files in Input, Output, and Temp directories
+Input/*
+Output/*
+Temp/*
+
+# Log file
+NIFConverter.log
+
+# Sniff files
+Sniff.exe
+Sniff.ini
+Sniff.log
+NifMopp.dll
+

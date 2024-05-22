@@ -134,7 +134,7 @@ void processJsonFile(const fs::path& inputDir) {
 		outputToConsoleAndFile("ERROR: NiHeader not found in: " + relativeDir.u8string() + " File is likely the wrong format or corrupted!\n", LOG_FILE);
 
 
-	// Add BSShaderPPLightingProperty, BSShaderTextureSet, and update NiGeomMorpherController and Vertex properties
+	// Add BSShaderPPLightingProperty, BSShaderTextureSet, and update NiGeomMorpherController and Vector Flags
 	auto blockTypeIndex = jsonData["NiHeader"]["Block Type Index"];
 	size_t blockTypeIndexRange = blockTypeIndex.size();
 
@@ -148,8 +148,12 @@ void processJsonFile(const fs::path& inputDir) {
 			if (!texturingProperty.is_null()) {
 				nlohmann::ordered_json sourceTexture = jsonData[texturingProperty["Base Texture"]["Source"]];
 				std::string texturePath = sourceTexture["File Name"];
+				std::transform(texturePath.begin(), texturePath.end(), texturePath.begin(), ::tolower);
 				size_t pos = texturePath.rfind(".dds");
-				texturePath.erase(pos);
+				if (pos != std::string::npos)
+					texturePath.erase(pos);
+				else
+					outputToConsoleAndFile("ERROR: Texture path invalid for " + std::to_string(blockTypeIndexRange + 1) + " BSShaderTextureSet. Manual correction will be required!\n", LOG_FILE);
 				size_t geomBlockNumProperties = geomBlock["Properties"].size();
 
 				auto& properties = geomBlock["Properties"];
@@ -179,7 +183,7 @@ void processJsonFile(const fs::path& inputDir) {
 				blockTypeIndexRange++;
 
 				jsonData[std::to_string(blockTypeIndexRange) + " BSShaderTextureSet"] = {
-					{"Textures", nlohmann::json::array({texturePath + ".dds", texturePath + "_n.dds", "", "", "", ""})},
+					{"Textures", nlohmann::json::array({texturePath + ".dds", texturePath + "_n.dds", texturePath + "_g.dds", "", "", ""})},
 				};
 				jsonData["NiHeader"]["Block Type Index"].push_back("BSShaderTextureSet");
 				if (!jsonData["NiHeader"]["Block Types"].contains("BSShaderTextureSet"))
@@ -239,7 +243,7 @@ void processJsonFile(const fs::path& inputDir) {
 				std::vector<std::string> interpolatorIDs(numControlledBlocks);
 				size_t interpolatorIDOffset;
 				size_t nextNullTerminatorPos;
-
+	
 				for (auto& j : controlledBlocks.items()) {
 					nlohmann::ordered_json& controlledBlock = j.value();
 
